@@ -1,0 +1,41 @@
+@ColorComparisonApi_HostAddress = http://localhost:5000
+
+### Color Comparison - Compare 5 colors against scales
+POST {{ColorComparisonApi_HostAddress}}/api/ColorComparison/compare
+Content-Type: application/json
+
+{
+  "colorHexCodes": [
+    "#FFFF00",
+    "#FFFF99",
+    "#80DEEA",
+    "#CE93D8",
+    "#A5D6A7"
+  ]
+}
+
+### Color Comparison - Invalid input (only 3 colors)
+POST {{ColorComparisonApi_HostAddress}}/api/ColorComparison/compare
+Content-Type: application/json
+
+{
+  "colorHexCodes": [
+    "#FFFF00",
+    "#FFFF99",
+    "#80DEEA"
+  ]
+}
+
+### Color Comparison - Invalid hex code
+POST {{ColorComparisonApi_HostAddress}}/api/ColorComparison/compare
+Content-Type: application/json
+
+{
+  "colorHexCodes": [
+    "#FFFF00",
+    "#GGGGGG",
+    "#80DEEA",
+    "#CE93D8",
+    "#A5D6A7"
+  ]
+}
