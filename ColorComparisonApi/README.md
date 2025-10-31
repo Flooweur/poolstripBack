@@ -114,9 +114,30 @@ curl -X POST "https://localhost:5001/api/ColorComparison/compare" \
 ## How It Works
 
 1. **Input Validation**: Validates that exactly 5 valid hex color codes are provided
-2. **Color Matching**: For each input color, finds the closest reference color in the corresponding scale using Euclidean distance in RGB color space
-3. **Value Calculation**: Returns the value associated with the closest matching reference color
-4. **Response**: Returns results for all 5 scales with the matched values and color information
+2. **Color Matching**: For each input color, uses the CIEDE2000 algorithm to calculate perceptually accurate color differences against all reference colors in the corresponding scale
+3. **Value Calculation**: 
+   - If the color is very close to a reference color (deltaE < 1.0), returns that exact value
+   - Otherwise, performs weighted interpolation between the two closest reference colors based on their CIEDE2000 distances
+4. **Response**: Returns results for all 5 scales with the interpolated values and color information
+
+### CIEDE2000 Algorithm
+
+This API uses the CIEDE2000 color difference formula, which provides perceptually uniform color comparisons. Unlike simple RGB distance, CIEDE2000:
+
+- **Converts colors to LAB color space** (via RGB → XYZ → LAB transformation)
+- **Accounts for human perception** of color differences
+- **Provides accurate matching** across different hues, saturations, and lightnesses
+- **Industry standard** for color quality control and matching
+
+### Interpolation
+
+Instead of simply returning the value of the closest color match, the API interpolates between the two closest matches using weighted averaging:
+
+- **Weight calculation**: Uses inverse distance weighting, so closer colors contribute more to the final value
+- **Smooth gradients**: Provides values between reference points for colors that fall "in between"
+- **More accurate**: Better represents the actual measurement value for intermediate colors
+
+**Example**: If a test color falls between yellow (0 ppm) and green (1.0 ppm), and is closer to yellow, the result might be 0.35 ppm rather than snapping to either 0 or 1.0.
 
 ## Project Structure
 

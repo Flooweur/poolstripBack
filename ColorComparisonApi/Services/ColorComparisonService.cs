@@ -4,6 +4,7 @@ namespace ColorComparisonApi.Services;
 
 /// <summary>
 /// Service for comparing colors against predefined scales (like pool test strips)
+/// Uses CIEDE2000 algorithm for perceptually accurate color comparison
 /// </summary>
 public class ColorComparisonService : IColorComparisonService
 {
@@ -151,22 +152,11 @@ public class ColorComparisonService : IColorComparisonService
             var scale = _scales[i];
             var inputColor = colorHexCodes[i];
 
-            // Find the closest matching color point on this scale
-            var closestPoint = FindClosestColorPoint(inputColor, scale);
+            // Get interpolated value using CIEDE2000 color matching
+            var scaleResult = GetInterpolatedValue(inputColor, scale);
 
-            if (closestPoint != null)
+            if (scaleResult != null)
             {
-                var scaleResult = new ScaleResult
-                {
-                    ScaleName = scale.Name,
-                    Value = closestPoint.Value,
-                    MinValue = scale.ColorPoints.Min(cp => cp.Value),
-                    MaxValue = scale.ColorPoints.Max(cp => cp.Value),
-                    MatchedColor = inputColor,
-                    ClosestReferenceColor = closestPoint.HexColor,
-                    ColorDistance = CalculateColorDistance(inputColor, closestPoint.HexColor)
-                };
-
                 response.ScaleResults.Add(scaleResult);
             }
         }
@@ -175,59 +165,242 @@ public class ColorComparisonService : IColorComparisonService
     }
 
     /// <summary>
-    /// Finds the closest color point on a scale to the input color
+    /// Gets the interpolated value for a color on a scale using CIEDE2000 algorithm
+    /// and weighted interpolation between the two closest color matches.
     /// </summary>
-    private ColorPoint? FindClosestColorPoint(string inputHex, ColorScale scale)
+    private ScaleResult? GetInterpolatedValue(string testColorHex, ColorScale scale)
     {
         if (scale.ColorPoints.Count == 0)
             return null;
 
-        ColorPoint? closestPoint = null;
-        double minDistance = double.MaxValue;
-
-        foreach (var point in scale.ColorPoints)
+        if (scale.ColorPoints.Count == 1)
         {
-            double distance = CalculateColorDistance(inputHex, point.HexColor);
-
-            if (distance < minDistance)
+            var point = scale.ColorPoints[0];
+            return new ScaleResult
             {
-                minDistance = distance;
-                closestPoint = point;
-            }
+                ScaleName = scale.Name,
+                Value = point.Value,
+                MinValue = point.Value,
+                MaxValue = point.Value,
+                MatchedColor = testColorHex,
+                ClosestReferenceColor = point.HexColor,
+                ColorDistance = CalculateCIEDE2000(HexToLab(testColorHex), HexToLab(point.HexColor))
+            };
         }
 
-        return closestPoint;
+        // Convert test color to LAB
+        var testLab = HexToLab(testColorHex);
+
+        // Calculate CIEDE2000 distances for all chart colors
+        var distances = scale.ColorPoints.Select(point => new
+        {
+            Point = point,
+            Distance = CalculateCIEDE2000(testLab, HexToLab(point.HexColor))
+        }).OrderBy(x => x.Distance).ToList();
+
+        // If we have an exact match (or very close), return that value
+        if (distances[0].Distance < 1.0) // Threshold for "just noticeable difference"
+        {
+            return new ScaleResult
+            {
+                ScaleName = scale.Name,
+                Value = distances[0].Point.Value,
+                MinValue = scale.ColorPoints.Min(cp => cp.Value),
+                MaxValue = scale.ColorPoints.Max(cp => cp.Value),
+                MatchedColor = testColorHex,
+                ClosestReferenceColor = distances[0].Point.HexColor,
+                ColorDistance = distances[0].Distance
+            };
+        }
+
+        // Use the two closest colors for interpolation
+        var closest1 = distances[0];
+        var closest2 = distances[1];
+
+        // Weighted interpolation based on inverse distance
+        // The closer the color, the more weight it gets
+        double weight1 = 1.0 / (closest1.Distance + 0.1); // Add small epsilon to avoid division by zero
+        double weight2 = 1.0 / (closest2.Distance + 0.1);
+        double totalWeight = weight1 + weight2;
+
+        double interpolatedValue = (closest1.Point.Value * weight1 + closest2.Point.Value * weight2) / totalWeight;
+
+        return new ScaleResult
+        {
+            ScaleName = scale.Name,
+            Value = interpolatedValue,
+            MinValue = scale.ColorPoints.Min(cp => cp.Value),
+            MaxValue = scale.ColorPoints.Max(cp => cp.Value),
+            MatchedColor = testColorHex,
+            ClosestReferenceColor = closest1.Point.HexColor,
+            ColorDistance = closest1.Distance
+        };
     }
 
     /// <summary>
-    /// Calculates the Euclidean distance between two colors in RGB space
+    /// Calculates the CIEDE2000 color difference between two LAB colors.
+    /// Based on the paper "The CIEDE2000 Color-Difference Formula" by Sharma, Wu, and Dalal.
     /// </summary>
-    private double CalculateColorDistance(string hex1, string hex2)
+    private double CalculateCIEDE2000((double L, double a, double b) lab1,
+                                      (double L, double a, double b) lab2)
     {
-        var rgb1 = HexToRgb(hex1);
-        var rgb2 = HexToRgb(hex2);
+        // Reference constants
+        const double kL = 1.0;
+        const double kC = 1.0;
+        const double kH = 1.0;
+        const double deg360InRad = Math.PI * 2;
+        const double deg180InRad = Math.PI;
+        const double pow25To7 = 6103515625.0;
 
-        // Euclidean distance in RGB color space
-        double rDiff = rgb1.R - rgb2.R;
-        double gDiff = rgb1.G - rgb2.G;
-        double bDiff = rgb1.B - rgb2.B;
+        // Calculate C and h
+        double C1 = Math.Sqrt(lab1.a * lab1.a + lab1.b * lab1.b);
+        double C2 = Math.Sqrt(lab2.a * lab2.a + lab2.b * lab2.b);
+        double barC = (C1 + C2) / 2.0;
 
-        return Math.Sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
+        double G = 0.5 * (1 - Math.Sqrt(Math.Pow(barC, 7) / (Math.Pow(barC, 7) + pow25To7)));
+
+        double a1Prime = (1.0 + G) * lab1.a;
+        double a2Prime = (1.0 + G) * lab2.a;
+
+        double C1Prime = Math.Sqrt(a1Prime * a1Prime + lab1.b * lab1.b);
+        double C2Prime = Math.Sqrt(a2Prime * a2Prime + lab2.b * lab2.b);
+
+        double h1Prime = (Math.Atan2(lab1.b, a1Prime) + deg360InRad) % deg360InRad;
+        double h2Prime = (Math.Atan2(lab2.b, a2Prime) + deg360InRad) % deg360InRad;
+
+        // Calculate delta values
+        double deltaLPrime = lab2.L - lab1.L;
+        double deltaCPrime = C2Prime - C1Prime;
+
+        double deltahPrime;
+        if (C1Prime * C2Prime == 0)
+        {
+            deltahPrime = 0;
+        }
+        else if (Math.Abs(h2Prime - h1Prime) <= deg180InRad)
+        {
+            deltahPrime = h2Prime - h1Prime;
+        }
+        else if (h2Prime - h1Prime > deg180InRad)
+        {
+            deltahPrime = h2Prime - h1Prime - deg360InRad;
+        }
+        else
+        {
+            deltahPrime = h2Prime - h1Prime + deg360InRad;
+        }
+
+        double deltaHPrime = 2.0 * Math.Sqrt(C1Prime * C2Prime) * Math.Sin(deltahPrime / 2.0);
+
+        // Calculate CIEDE2000
+        double barLPrime = (lab1.L + lab2.L) / 2.0;
+        double barCPrime = (C1Prime + C2Prime) / 2.0;
+
+        double barhPrime;
+        if (C1Prime * C2Prime == 0)
+        {
+            barhPrime = h1Prime + h2Prime;
+        }
+        else if (Math.Abs(h1Prime - h2Prime) <= deg180InRad)
+        {
+            barhPrime = (h1Prime + h2Prime) / 2.0;
+        }
+        else if (h1Prime + h2Prime < deg360InRad)
+        {
+            barhPrime = (h1Prime + h2Prime + deg360InRad) / 2.0;
+        }
+        else
+        {
+            barhPrime = (h1Prime + h2Prime - deg360InRad) / 2.0;
+        }
+
+        double T = 1.0 - 0.17 * Math.Cos(barhPrime - Math.PI / 6.0) +
+                   0.24 * Math.Cos(2.0 * barhPrime) +
+                   0.32 * Math.Cos(3.0 * barhPrime + Math.PI / 30.0) -
+                   0.20 * Math.Cos(4.0 * barhPrime - 7.0 * Math.PI / 20.0);
+
+        double deltaTheta = (Math.PI / 6.0) * Math.Exp(-Math.Pow((barhPrime - 275.0 * Math.PI / 180.0) / (25.0 * Math.PI / 180.0), 2));
+        double RC = 2.0 * Math.Sqrt(Math.Pow(barCPrime, 7) / (Math.Pow(barCPrime, 7) + pow25To7));
+        double SL = 1.0 + (0.015 * Math.Pow(barLPrime - 50.0, 2)) / Math.Sqrt(20.0 + Math.Pow(barLPrime - 50.0, 2));
+        double SC = 1.0 + 0.045 * barCPrime;
+        double SH = 1.0 + 0.015 * barCPrime * T;
+        double RT = -Math.Sin(2.0 * deltaTheta) * RC;
+
+        double deltaE = Math.Sqrt(
+            Math.Pow(deltaLPrime / (kL * SL), 2) +
+            Math.Pow(deltaCPrime / (kC * SC), 2) +
+            Math.Pow(deltaHPrime / (kH * SH), 2) +
+            RT * (deltaCPrime / (kC * SC)) * (deltaHPrime / (kH * SH))
+        );
+
+        return deltaE;
     }
 
     /// <summary>
-    /// Converts a hex color code to RGB values
+    /// Converts hex color to LAB color space
     /// </summary>
-    private (int R, int G, int B) HexToRgb(string hex)
+    private (double L, double a, double b) HexToLab(string hex)
     {
-        // Remove # if present
+        var rgb = HexToRgb(hex);
+        var xyz = RgbToXyz(rgb);
+        return XyzToLab(xyz);
+    }
+
+    /// <summary>
+    /// Converts a hex color code to RGB values (0.0 - 1.0 range)
+    /// </summary>
+    private (double R, double G, double B) HexToRgb(string hex)
+    {
         hex = hex.TrimStart('#');
 
         int r = Convert.ToInt32(hex.Substring(0, 2), 16);
         int g = Convert.ToInt32(hex.Substring(2, 2), 16);
         int b = Convert.ToInt32(hex.Substring(4, 2), 16);
 
-        return (r, g, b);
+        return (r / 255.0, g / 255.0, b / 255.0);
+    }
+
+    /// <summary>
+    /// Converts RGB to XYZ color space using D65 illuminant
+    /// </summary>
+    private (double X, double Y, double Z) RgbToXyz((double R, double G, double B) rgb)
+    {
+        // Convert to linear RGB
+        double r = rgb.R > 0.04045 ? Math.Pow((rgb.R + 0.055) / 1.055, 2.4) : rgb.R / 12.92;
+        double g = rgb.G > 0.04045 ? Math.Pow((rgb.G + 0.055) / 1.055, 2.4) : rgb.G / 12.92;
+        double b = rgb.B > 0.04045 ? Math.Pow((rgb.B + 0.055) / 1.055, 2.4) : rgb.B / 12.92;
+
+        // Convert to XYZ using D65 illuminant
+        double x = r * 0.4124564 + g * 0.3575761 + b * 0.1804375;
+        double y = r * 0.2126729 + g * 0.7151522 + b * 0.0721750;
+        double z = r * 0.0193339 + g * 0.1191920 + b * 0.9503041;
+
+        return (x * 100, y * 100, z * 100);
+    }
+
+    /// <summary>
+    /// Converts XYZ to LAB color space using D65 white point
+    /// </summary>
+    private (double L, double a, double b) XyzToLab((double X, double Y, double Z) xyz)
+    {
+        // D65 reference white point
+        const double refX = 95.047;
+        const double refY = 100.000;
+        const double refZ = 108.883;
+
+        double x = xyz.X / refX;
+        double y = xyz.Y / refY;
+        double z = xyz.Z / refZ;
+
+        x = x > 0.008856 ? Math.Pow(x, 1.0 / 3.0) : (7.787 * x + 16.0 / 116.0);
+        y = y > 0.008856 ? Math.Pow(y, 1.0 / 3.0) : (7.787 * y + 16.0 / 116.0);
+        z = z > 0.008856 ? Math.Pow(z, 1.0 / 3.0) : (7.787 * z + 16.0 / 116.0);
+
+        double L = 116.0 * y - 16.0;
+        double a = 500.0 * (x - y);
+        double b = 200.0 * (y - z);
+
+        return (L, a, b);
     }
 
     /// <summary>
