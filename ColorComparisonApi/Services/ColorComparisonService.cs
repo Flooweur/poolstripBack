@@ -22,81 +22,73 @@ public class ColorComparisonService : IColorComparisonService
     {
         var scales = new List<ColorScale>();
 
-        // TODO: Define Scale 1 - Example: pH Scale
-        // Example structure:
-        // scales.Add(new ColorScale
-        // {
-        //     Name = "pH",
-        //     ColorPoints = new List<ColorPoint>
-        //     {
-        //         new ColorPoint { Value = 6.0, HexColor = "#FFFF00" },  // Yellow
-        //         new ColorPoint { Value = 6.5, HexColor = "#FFE600" },
-        //         new ColorPoint { Value = 7.0, HexColor = "#FFC800" },
-        //         new ColorPoint { Value = 7.5, HexColor = "#FFA500" },
-        //         new ColorPoint { Value = 8.0, HexColor = "#FF8C00" },
-        //         new ColorPoint { Value = 8.5, HexColor = "#FF6600" }   // Orange
-        //     }
-        // });
+        scales.Add(new ColorScale
+        {
+            Name = "Total Hardness",
+            ColorPoints = new List<ColorPoint>
+            {
+                new ColorPoint { Value = 0, HexColor = "#011a94" },
+                new ColorPoint { Value = 100, HexColor = "#2539a9" },
+                new ColorPoint { Value = 250, HexColor = "#402ba0" },
+                new ColorPoint { Value = 500, HexColor = "#873b9c" },
+                new ColorPoint { Value = 1000, HexColor = "#8f208b" }
+            }
+        });
 
-        // TODO: Define Scale 2 - Example: Chlorine
-        // scales.Add(new ColorScale
-        // {
-        //     Name = "Chlorine",
-        //     ColorPoints = new List<ColorPoint>
-        //     {
-        //         new ColorPoint { Value = 0.0, HexColor = "#FFFFFF" },   // White
-        //         new ColorPoint { Value = 0.5, HexColor = "#FFFFCC" },
-        //         new ColorPoint { Value = 1.0, HexColor = "#FFFF99" },   // Light yellow
-        //         new ColorPoint { Value = 3.0, HexColor = "#FFFF00" },   // Yellow
-        //         new ColorPoint { Value = 5.0, HexColor = "#FFD700" },
-        //         new ColorPoint { Value = 10.0, HexColor = "#FFA500" }   // Orange
-        //     }
-        // });
+        scales.Add(new ColorScale
+        {
+            Name = "Total Chlorine",
+            ColorPoints = new List<ColorPoint>
+            {
+                new ColorPoint { Value = 0.0, HexColor = "#fefeaa" },
+                new ColorPoint { Value = 0.5, HexColor = "#f3fdaa" },
+                new ColorPoint { Value = 1.0, HexColor = "#e7f4a1" },
+                new ColorPoint { Value = 3.0, HexColor = "#b8d88c" },
+                new ColorPoint { Value = 5.0, HexColor = "#90c676" },
+                new ColorPoint { Value = 10.0, HexColor = "#4ba35e" }
+            }
+        });
 
-        // TODO: Define Scale 3 - Example: Alkalinity
-        // scales.Add(new ColorScale
-        // {
-        //     Name = "Alkalinity",
-        //     ColorPoints = new List<ColorPoint>
-        //     {
-        //         new ColorPoint { Value = 0, HexColor = "#E0F7FA" },     // Very light cyan
-        //         new ColorPoint { Value = 40, HexColor = "#B2EBF2" },
-        //         new ColorPoint { Value = 80, HexColor = "#80DEEA" },
-        //         new ColorPoint { Value = 120, HexColor = "#4DD0E1" },
-        //         new ColorPoint { Value = 180, HexColor = "#26C6DA" },
-        //         new ColorPoint { Value = 240, HexColor = "#00BCD4" }    // Cyan
-        //     }
-        // });
+        scales.Add(new ColorScale
+        {
+            Name = "Free Chlorine",
+            ColorPoints = new List<ColorPoint>
+            {
+                new ColorPoint { Value = 0, HexColor = "#fefdcd" },
+                new ColorPoint { Value = 0.5, HexColor = "#f8f8df" },
+                new ColorPoint { Value = 1.0, HexColor = "#e7dfd7" },
+                new ColorPoint { Value = 3.0, HexColor = "#ad8bcf" },
+                new ColorPoint { Value = 5.0, HexColor = "#9d69bc" },
+                new ColorPoint { Value = 10.0, HexColor = "#801d9a" }
+            }
+        });
 
-        // TODO: Define Scale 4 - Example: Hardness
-        // scales.Add(new ColorScale
-        // {
-        //     Name = "Hardness",
-        //     ColorPoints = new List<ColorPoint>
-        //     {
-        //         new ColorPoint { Value = 0, HexColor = "#F3E5F5" },     // Very light purple
-        //         new ColorPoint { Value = 50, HexColor = "#E1BEE7" },
-        //         new ColorPoint { Value = 100, HexColor = "#CE93D8" },
-        //         new ColorPoint { Value = 250, HexColor = "#BA68C8" },
-        //         new ColorPoint { Value = 500, HexColor = "#AB47BC" },
-        //         new ColorPoint { Value = 1000, HexColor = "#9C27B0" }   // Purple
-        //     }
-        // });
+        scales.Add(new ColorScale
+        {
+            Name = "pH",
+            ColorPoints = new List<ColorPoint>
+            {
+                new ColorPoint { Value = 6.2, HexColor = "#f3af3d" },
+                new ColorPoint { Value = 6.8, HexColor = "#e96a2b" },
+                new ColorPoint { Value = 7.2, HexColor = "#e03723" },
+                new ColorPoint { Value = 7.8, HexColor = "#df3021" },
+                new ColorPoint { Value = 8.4, HexColor = "#d62d20" }
+            }
+        });
 
-        // TODO: Define Scale 5 - Example: Stabilizer/Cyanuric Acid
-        // scales.Add(new ColorScale
-        // {
-        //     Name = "Stabilizer",
-        //     ColorPoints = new List<ColorPoint>
-        //     {
-        //         new ColorPoint { Value = 0, HexColor = "#E8F5E9" },     // Very light green
-        //         new ColorPoint { Value = 10, HexColor = "#C8E6C9" },
-        //         new ColorPoint { Value = 30, HexColor = "#A5D6A7" },
-        //         new ColorPoint { Value = 50, HexColor = "#81C784" },
-        //         new ColorPoint { Value = 100, HexColor = "#66BB6A" },
-        //         new ColorPoint { Value = 150, HexColor = "#4CAF50" }    // Green
-        //     }
-        // });
+        scales.Add(new ColorScale
+        {
+            Name = "Total Alkalinity",
+            ColorPoints = new List<ColorPoint>
+            {
+                new ColorPoint { Value = 0, HexColor = "#e2c040" },
+                new ColorPoint { Value = 40, HexColor = "#a5a934" },
+                new ColorPoint { Value = 80, HexColor = "#899f3a" },
+                new ColorPoint { Value = 120, HexColor = "#486f36" },
+                new ColorPoint { Value = 180, HexColor = "#22522f" },
+                new ColorPoint { Value = 240, HexColor = "#245760" }
+            }
+        });
 
         return scales;
     }
